@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>معاينة Markdown + LaTeX</title>
+
+<script>
+(function () {
+
+  function loadScript(src, check, fallback) {
+    return new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = src;
+      script.onload = () => {
+        if (!check || check()) {
+          resolve();
+        } else if (fallback) {
+          loadScript(fallback.src, fallback.check).then(resolve).catch(reject);
+        } else {
+          reject();
+        }
+      };
+      script.onerror = () => {
+        if (fallback) {
+          loadScript(fallback.src, fallback.check).then(resolve).catch(reject);
+        } else {
+          reject();
+        }
+      };
+      document.head.appendChild(script);
+    });
+  }
+
+  function loadStyle(href, fallbackHref) {
+    return new Promise((resolve) => {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = href;
+      link.onload = resolve;
+      link.onerror = () => {
+        if (fallbackHref) {
+          const fallbackLink = document.createElement("link");
+          fallbackLink.rel = "stylesheet";
+          fallbackLink.href = fallbackHref;
+          document.head.appendChild(fallbackLink);
+        }
+        resolve();
+      };
+      document.head.appendChild(link);
+    });
+  }
+
+  // KaTeX CSS
+  loadStyle(
+    "lib/katex.min.css",
+    "https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css"
+  );
+
+  // Marked
+  loadScript(
+    "lib/marked.min.js",
+    () => typeof window.marked !== "undefined",
+    {
+      src: "https://cdn.jsdelivr.net/npm/marked/marked.min.js",
+      check: () => typeof window.marked !== "undefined"
+    }
+  )
+
+  // KaTeX Core
+  .then(() => loadScript(
+    "lib/katex.min.js",
+    () => typeof window.katex !== "undefined",
+    {
+      src: "https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js",
+      check: () => typeof window.katex !== "undefined"
+    }
+  ))
+
+  // KaTeX Auto Render
+  .then(() => loadScript(
+    "lib/auto-render.min.js",
+    () => typeof window.renderMathInElement !== "undefined",
+    {
+      src: "https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/contrib/auto-render.min.js",
+      check: () => typeof window.renderMathInElement !== "undefined"
+    }
+  ))
+
+  .catch(() => {
+    console.error("فشل تحميل إحدى المكتبات");
+  });
+
+})();
+</script>
+
+  <style>
+    body { font-family: "Amiri", "Arial", sans-serif; margin: 20px; background: #f9f9f9; direction: rtl; }
+    header { display:flex; gap:10px; align-items:center; margin-bottom:12px; }
+    .controls { display:flex; gap:8px; align-items:center; }
+    textarea { width: 100%; height: 150px; padding: 10px; direction: rtl; text-align: right; box-sizing: border-box; }
+    #preview { margin-top: 15px; padding: 15px; border: 1px solid #aaa; background: #fff; min-height: 100px; box-sizing: border-box; }
+   
+         p {
+        margin-block: 4px;
+        line-height: 1.35;
+        word-spacing: -0.5px;
+        letter-spacing: -0.2px;
+}
+   
+   
+pre, code {
+      background: #f5f5f5;
+    //  padding: 4px 8px;
+  //    border-radius: 4px;
+      direction: ltr;
+      text-align: left;
+  //    display: block;
+      overflow-x: auto;
+    }
+
+
+    table {
+      border-collapse: collapse;
+      width: 95%;
+      margin: 20px auto;
+    }
+
+    table, th, td {
+      border: 2px solid black;
+    }
+
+    th, td {
+      padding: 10px;
+      text-align: center;
+      word-wrap: break-word;
+      white-space: normal;
+      max-width: 200px;
+    }
+
+    /* حالة المستخدم */
+    #statusBar {
+      margin-left: auto;
+      font-size: 0.95rem;
+      color: #333;
+      background: #fff;
+      border: 1px solid #ddd;
+      padding: 6px 10px;
+      border-radius: 6px;
+    }
+
+    button, label.file-label {
+      cursor: pointer;
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px solid #888;
+      background: #fff;
+      font-size: 0.95rem;
+    }
+
+    input[type="file"] { display: none; }
+
+    #message { margin-top:8px; color:#666; font-size:0.95rem; }
+
+    /* عناصر واجهة الطباعة */
+    .print-overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255,255,255,0.85);
+      z-index: 9999;
+      text-align: center;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    .print-overlay .box {
+      background: #fff;
+      border: 1px solid #ddd;
+      padding: 14px 18px;
+      border-radius: 8px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+      max-width: 520px;
+      direction: rtl;
+    }
+    .countdown {
+      font-weight: 700;
+      font-size: 1.2rem;
+      margin-top: 8px;
+    }
+
+    /* حالة طباعة: نجعل preview يأخذ العرض كاملاً عند الطباعة إذا أردنا */
+    @media print {
+      body * { visibility: hidden; } /* نتحكم قبل الطباعة عبر JS، لكن هذه قاعدة أمان */
+      #preview, #preview * { visibility: visible; }
+      #preview { position: absolute; top: 0; left: 0; right: 0; width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="controls">
+      <label class="file-label" for="fileInput" title="استيراد ملف نصي (.txt)">تحميل ملف نصي</label>
+      <input id="fileInput" type="file" accept=".txt,text/plain" />
+      <button id="clearButton" title="مسح المحتوى">مسح النص</button>
+      <!-- زر الطباعة المطلوب -->
+      <button id="printButton" title="إخفاء الواجهة وتهيئة المعاينة للطباعة">تحويل إلى pdf من متصفح</button>
+    </div>
+
+    <div id="statusBar" aria-live="polite">
+      الحالة: <span id="statusText">جاهز</span>
+      <span id="lastConverted" style="margin-inline-start:10px; font-size:0.9rem; color:#666;"></span>
+    </div>
+  </header>
+
+  <textarea id="editor"># مثال
+نص عربي **غامق** و *مائل*.
+
+معادلة في سطر: $E = mc^2$
+
+رموز يونانية: $\alpha + \beta = \gamma$
+
+كتلة رياضية:
+$$
+\int_0^\pi \sin(x)\, dx = 2
+$$
+
+```js
+console.log("مرحبا يا عالم");
+````
+
+  </textarea>
+
+  <div id="preview"></div>
+  <div id="message" aria-live="polite"></div>
+
+  <script>
+    // عناصر DOM
+    const editor = document.getElementById("editor");
+    const preview = document.getElementById("preview");
+    const fileInput = document.getElementById("fileInput");
+    const clearButton = document.getElementById("clearButton");
+    const statusText = document.getElementById("statusText");
+    const lastConverted = document.getElementById("lastConverted");
+    const messageBox = document.getElementById("message");
+    const printButton = document.getElementById("printButton");
+
+    // إعدادات السلوك
+    const SHORT_DELAY_MS = 700;       // تأخير بسيط قبل بدء التحويل (debounce عند التوقف عن الكتابة)
+    const THROTTLE_INTERVAL_MS = 10000; // فترة 10 ثوانٍ كحد أدنى بين عمليتي تحويل متتاليتين (throttle)
+    const PRINT_WAIT_MS = 5000; // 5 ثانية انتظار قبل الطباعة تلقائياً
+
+    // حالة المتابعة
+    let debounceTimer = null;           // لتأخير قصير أثناء الكتابة
+    let scheduledConversionTimeout = null;
+    let lastConvertedText = null;       // يخزن النص الذي تم تحويله آخر مرة
+    let lastConversionTime = 0;         // timestamp لآخر تحويل (ms)
+    let pendingConversion = false;      // هل هناك تحويل معلق للقيام به لاحقًا
+
+    // --- الدالة الأصلية (محافظة على المنطق كما في الكود المقدم) ---
+    /**
+ * تحويل Markdown مع الحفاظ على الصيغ الرياضية
+ * يدعم:
+ *  - $$ ... $$  (Block Math)
+ *  - $ ... $    (Inline Math)
+ *  - [ ... ]    (Inline Math - مضاف حديثًا)
+ */
+function convertMarkdownWithMath(text) {
+
+  // مصفوفة لتخزين جميع الصيغ الرياضية مؤقتًا
+  const mathBlocks = [];
+
+  /* ===============================
+     1) حفظ واستبدال الكتل الرياضية $$ ... $$
+     =============================== */
+  const blockRegex = /\$\$[\s\S]*?\$\$/g;
+  text = text.replace(blockRegex, function (match) {
+    const id = mathBlocks.length;
+    mathBlocks.push(match);
+    return `\n\n@@MATH_BLOCK_${id}@@\n\n`;
+  });
+
+  /* ===============================
+     2) حفظ واستبدال الصيغ الرياضية المضمنة $ ... $
+        (مع تجاهل \$ الهاربة)
+     =============================== */
+  text = text.replace(/(^|[^\\])\$([^$]*?[^\\])\$/g, function (fullMatch, p1, p2) {
+    const id = mathBlocks.length;
+    mathBlocks.push('$' + p2 + '$');
+    return p1 + `@@MATH_INLINE_${id}@@`;
+  });
+
+  /* ===============================
+     3) حفظ واستبدال الصيغ الرياضية بين [ ... ]
+        (إضافة جديدة بدون المساس بالمنطق السابق)
+     =============================== */
+  text = text.replace(/\[([^\[\]]+?)\]/g, function (match, content) {
+    const id = mathBlocks.length;
+    mathBlocks.push('$' + content + '$');
+    return `@@MATH_BRACKET_${id}@@`;
+  });
+
+  /* ===============================
+     4) تحويل Markdown إلى HTML
+     =============================== */
+  let html = marked.parse(text, { breaks: true });
+
+  /* ===============================
+     5) استعادة جميع الصيغ الرياضية
+     =============================== */
+  html = html
+    .replace(/@@MATH_BLOCK_(\d+)@@/g, function (_, id) {
+      return mathBlocks[parseInt(id, 10)];
+    })
+    .replace(/@@MATH_INLINE_(\d+)@@/g, function (_, id) {
+      return mathBlocks[parseInt(id, 10)];
+    })
+    .replace(/@@MATH_BRACKET_(\d+)@@/g, function (_, id) {
+      return mathBlocks[parseInt(id, 10)];
+    });
+
+  return html;
+}
+
+/**
+ * تطبيق KaTeX بشكل آمن على عنصر HTML
+ */
+function renderMathInElementSafe(container) {
+  if (typeof renderMathInElement !== 'undefined') {
+    try {
+      renderMathInElement(container, {
+        delimiters: [
+          { left: "$$", right: "$$", display: true },
+          { left: "$", right: "$", display: false }
+        ],
+        throwOnError: false
+      });
+    } catch (err) {
+      // أي خطأ في KaTeX لا يجب أن يكسر الصفحة
+      console.error("خطأ أثناء تطبيق KaTeX:", err);
+    }
+  }
+}
+
+
+    // دالة تقوم بالتحويل الفعلي وتحديث الواجهة
+    function performConversion(nowSourceText, sourceDescription = "مباشر") {
+      // حماية: إذا النص نفس النص المحوّل سابقًا، لا نفعل شيئًا
+      if (lastConvertedText !== null && nowSourceText === lastConvertedText) {
+        pendingConversion = false;
+        updateStatus("جاهز (لا تغيّر جديد)");
+        return;
+      }
+
+      try {
+        const html = convertMarkdownWithMath(nowSourceText);
+        preview.innerHTML = html;
+
+        // تطبيق KaTeX بعد إدخال HTML
+        renderMathInElementSafe(preview);
+
+        // تحديث بيانات الحالة
+        lastConvertedText = nowSourceText;
+        lastConversionTime = Date.now();
+        pendingConversion = false;
+        updateStatus(`تم التحويل (${sourceDescription})`);
+        lastConverted.textContent = `آخر تحويل: ${new Date(lastConversionTime).toLocaleTimeString('ar-EG')}`;
+        messageBox.textContent = "";
+      } catch (err) {
+        console.error("خطأ أثناء التحويل:", err);
+        messageBox.textContent = "حدث خطأ أثناء تحويل النص. تحقق من محتوى Markdown/LaTeX.";
+        updateStatus("خطأ");
+      }
+    }
+
+    // دالة تحدد هل نحتاج للتحويل الآن أم جدولة لاحقًا (تطبق throttle و debounce)
+    function scheduleConversionWithDebounce() {
+      const currentText = editor.value;
+
+      // إعادة ضبط المؤقت القصير (debounce)
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+        debounceTimer = null;
+      }
+
+      // بعد توقف قصير عن الكتابة، سنقرر ما إذا نحول فورًا أو نؤجله بسبب throttle
+      debounceTimer = setTimeout(() => {
+        const now = Date.now();
+        const timeSinceLastConversion = now - lastConversionTime;
+
+        // إذا النص لم يتغير منذ آخر تحويل، لا نعيد التحويل
+        if (lastConvertedText !== null && currentText === lastConvertedText) {
+          pendingConversion = false;
+          updateStatus("جاهز (لا تغيّر جديد)");
+          return;
+        }
+
+        // إذا مرّت فترة كافية منذ آخر تحويل -> تنفيذ فوري
+        if (timeSinceLastConversion >= THROTTLE_INTERVAL_MS || lastConversionTime === 0) {
+          performConversion(currentText, "مباشر");
+        } else {
+          // خلاف ذلك، نؤجل التحويل حتى يصبح عمر throttle كافياً
+          const remaining = THROTTLE_INTERVAL_MS - timeSinceLastConversion;
+
+          // إذا كان هناك موعد مجدول، ألغِه لتجنّب ازدواجية
+          if (scheduledConversionTimeout) {
+            clearTimeout(scheduledConversionTimeout);
+            scheduledConversionTimeout = null;
+          }
+
+          pendingConversion = true;
+          updateStatus(`قيد الانتظار (${Math.ceil(remaining / 1000)} ث)`);
+
+          // جدولة التحويل بعد المدة المتبقية
+          scheduledConversionTimeout = setTimeout(() => {
+            scheduledConversionTimeout = null;
+            performConversion(editor.value, "مجدول بعد 10s");
+          }, remaining + 20); // +20ms كسلامة زمنية
+        }
+      }, SHORT_DELAY_MS);
+    }
+
+    // مساعدة لتحديث شريط الحالة
+    function updateStatus(text) {
+      statusText.textContent = text;
+    }
+
+    // حدث التزويد النصي من المستخدم (يحاكي السلوك السابق لكن الآن يستخدم debounce+throttle)
+    editor.addEventListener("input", () => {
+      updateStatus("يعمل...");
+      scheduleConversionWithDebounce();
+    });
+
+    // زر مسح النص
+    clearButton.addEventListener("click", () => {
+      editor.value = "";
+      updateStatus("نص مُحذَّف");
+      // فورًا نحاول تحويل (سيتم تجاهل التحويل إذا النص نفس آخر تحويل)
+      scheduleConversionWithDebounce();
+    });
+
+    // --- تحميل ملف نصي ---
+    fileInput.addEventListener("change", (ev) => {
+      const file = ev.target.files && ev.target.files[0];
+      if (!file) {
+        return;
+      }
+
+      // تحقق سطحي من النوع وحجم الملف
+      const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 5 ميغابايت حد عملي
+      if (file.size > MAX_SIZE_BYTES) {
+        messageBox.textContent = "الملف كبير جداً. الرجاء اختيار ملف بحجم أقل من 10 ميغابايت.";
+        return;
+      }
+
+      if (!file.type || (!file.type.startsWith("text/") && !file.name.endsWith(".txt"))) {
+        // لا نرفض امتدادات غير نصية لكن نحذر المستخدم
+        const proceed = confirm("الملف المحدد قد لا يكون ملف نصي واضح. هل تود المتابعة؟");
+        if (!proceed) {
+          fileInput.value = ""; // إعادة تعيين
+          return;
+        }
+      }
+
+      const reader = new FileReader();
+
+      reader.onload = function(e) {
+        const content = String(e.target.result || "");
+        editor.value = content;
+        messageBox.textContent = `تم تحميل الملف: ${file.name}`;
+        updateStatus("ملف محمل");
+        // بعد تحميل الملف نرغب فورًا بتحديث المعاينة مع نفس قواعد debounce/throttle
+        scheduleConversionWithDebounce();
+      };
+
+      reader.onerror = function(e) {
+        console.error("خطأ قراءة الملف:", e);
+        messageBox.textContent = "فشل تحميل الملف. حاول مرة أخرى.";
+      };
+
+      try {
+        reader.readAsText(file, "utf-8");
+      } catch (err) {
+        console.error("استثناء أثناء قراءة الملف:", err);
+        messageBox.textContent = "حدث خطأ أثناء فتح الملف.";
+      }
+    });
+
+    // تنفيذ تحويل أولي عند تحميل الصفحة (يحافظ على سلوك الكود الأصلي)
+    window.addEventListener("load", () => {
+      // نستخدم performConversion مباشرة لضمان معاينة أولية فورية
+      performConversion(editor.value, "أولي");
+    });
+
+    // تنظيف المؤقتات عند مغادرة الصفحة (تحسين الموارد)
+    window.addEventListener("beforeunload", () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      if (scheduledConversionTimeout) clearTimeout(scheduledConversionTimeout);
+    });
+
+    /* ============================
+       وظائف: تحضير الطباعة ونافذة الانتظار
+       ============================ */
+
+    // حالة الطباعة الجارية
+    let isPrintFlowActive = false;
+    let printTimerId = null; // timeout لبدء الطباعة بعد الانتظار
+    let bodyClickListener = null;
+    const elementsOriginalDisplay = new Map();
+
+    // نجمع كل عناصر body التي سنخفيها (نترك #preview مرئي)
+    function saveAndHideEverythingExceptPreview() {
+      elementsOriginalDisplay.clear();
+      const allChildren = Array.from(document.body.children);
+      allChildren.forEach(el => {
+        // نسمح فقط لـ preview أن يبقى مرئيًا
+        if (el === preview) return;
+        // لا نخفي عنصر print-overlay نفسه لو كان موجوداً (سيتم إنشاؤه بعد)
+        if (el.classList && el.classList.contains('print-overlay')) return;
+        // خزّن قيمة العرض الأصلية واستعمل display: none
+        elementsOriginalDisplay.set(el, el.style.display || "");
+        el.style.display = 'none';
+        el.setAttribute('aria-hidden', 'true');
+      });
+
+      // نضمن أن preview يمكن رؤيته ويكون قابل للطباعة
+      preview.style.display = 'block';
+      preview.setAttribute('aria-hidden', 'false');
+      preview.style.maxWidth = '100%';
+      preview.style.margin = '0';
+      preview.style.padding = '20px';
+      preview.style.background = '#fff';
+      preview.style.border = 'none';
+      // نجعل الصفحة لاتحوي هوامش لتناسب الطباعة
+      document.documentElement.style.background = '#fff';
+      document.body.style.background = '#fff';
+    }
+
+    function restoreAllDisplaysAfterPrint() {
+      // استرجاع عناصر الـ DOM إلى حالتها الأصلية
+      elementsOriginalDisplay.forEach((display, el) => {
+        el.style.display = display || '';
+        if (display === '') {
+          // إزالة السمة إذا لم يكن لها قيمة
+          el.removeAttribute('style');
+        }
+        el.removeAttribute('aria-hidden');
+      });
+      elementsOriginalDisplay.clear();
+
+      // إعادة بعض الأنماط الافتراضية على preview (نظافة)
+      preview.style.removeProperty('max-width');
+      preview.style.removeProperty('margin');
+      preview.style.removeProperty('padding');
+      preview.style.removeProperty('background');
+      preview.style.removeProperty('border');
+
+      // إعادة الخلفية الافتراضية
+      document.documentElement.style.removeProperty('background');
+      document.body.style.removeProperty('background');
+
+      // إزالة أي Overlay متبقي
+      const existingOverlay = document.querySelector('.print-overlay');
+      if (existingOverlay && existingOverlay.parentNode) {
+        existingOverlay.parentNode.removeChild(existingOverlay);
+      }
+    }
+
+    // إنشاء overlay إعلامي مع العد التنازلي
+    function createPrintOverlay(waitMs) {
+      const overlay = document.createElement('div');
+      overlay.className = 'print-overlay';
+      overlay.innerHTML = `
+        <div class="box" role="dialog" aria-modal="true" aria-label="تحضير للطباعة">
+          <div>الآن ستتم طباعة المعاينة فقط. اضغط في أي مكان داخل الصفحة للطباعة فورًا أو الانتظار حتى انتهاء العد التنازلي.</div>
+          <div class="countdown">الانتظار: <span id="countdownSeconds">${Math.ceil(waitMs / 1000)}</span> ثانية</div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      return overlay;
+    }
+
+    // منبه الطباعة: يطبع فوراً (نافذة الطباعة)
+    function triggerPrintNow(reason = 'مستخدم') {
+      if (!isPrintFlowActive) return;
+      // قم بإلغاء المؤقتات وحدث الحالة
+      if (printTimerId) {
+        clearTimeout(printTimerId);
+        printTimerId = null;
+      }
+      // إزالة مستمع النقر المؤقت
+      if (bodyClickListener) {
+        document.body.removeEventListener('click', bodyClickListener, true);
+        bodyClickListener = null;
+      }
+      // تحديث الواجهة قبل الطباعة
+      updateStatus(`طباعة (${reason})`);
+      // استدعاء الطباعة
+      try {
+        // في بعض المتصفحات، window.print() قد يُرجع بعد إغلاق مربع الطباعة
+        window.print();
+      } catch (err) {
+        console.error('خطأ عند استدعاء window.print():', err);
+      } finally {
+        // بعد الطباعة، استرجع كل شيء
+        restoreAllDisplaysAfterPrint();
+        isPrintFlowActive = false;
+        printButton.disabled = false;
+        updateStatus('جاهز');
+      }
+    }
+
+    // الإجراء الرئيس عند الضغط على زر الطباعة
+    function handlePrintButtonClick() {
+      if (isPrintFlowActive) {
+        // إذا كانت هناك عملية طباعة قيد التنفيذ، لا نفعل شيئاً إضافياً
+        return;
+      }
+      isPrintFlowActive = true;
+      printButton.disabled = true;
+      updateStatus('تهيئة للطباعة...');
+
+      // أخفي كل شيء باستثناء preview
+      saveAndHideEverythingExceptPreview();
+
+      // أنشئ overlay للعد التنازلي
+      const overlay = createPrintOverlay(PRINT_WAIT_MS);
+
+      // مستمع نقر سريع: إذا نقر المستخدم في أي مكان، اطبع فوراً
+      bodyClickListener = function onBodyClickForPrint(e) {
+        // لو نقر المستخدم داخل overlay نفسه أيضاً نعتبره طلب للطباعة الآن
+        e.stopPropagation();
+        e.preventDefault();
+        triggerPrintNow('نقر المستخدم');
+      };
+      // أضف المستمع في مرحلة التقاط ليتم التقاط النقر مبكراً
+      document.body.addEventListener('click', bodyClickListener, true);
+
+      // عدّاد ثانوي لعرض الثواني المتبقية
+      const countdownSpan = overlay.querySelector('#countdownSeconds');
+      let remaining = Math.ceil(PRINT_WAIT_MS / 1000);
+      const countdownInterval = setInterval(() => {
+        remaining -= 1;
+        if (countdownSpan) countdownSpan.textContent = String(Math.max(0, remaining));
+        if (remaining <= 0) {
+          clearInterval(countdownInterval);
+        }
+      }, 1000);
+
+      // حدد المهلة التلقائية لبدء الطباعة بعد PRINT_WAIT_MS
+      printTimerId = setTimeout(() => {
+        // قم بالطباعة كـ "انتهى العد"
+        // إزالة مستمع النقر أولاً
+        if (bodyClickListener) {
+          document.body.removeEventListener('click', bodyClickListener, true);
+          bodyClickListener = null;
+        }
+        // استدعاء الطباعة الآن
+        triggerPrintNow('انتهاء العد');
+        clearInterval(countdownInterval);
+      }, PRINT_WAIT_MS);
+    }
+
+    // ربط الزر
+    printButton.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      try {
+        handlePrintButtonClick();
+      } catch (err) {
+        console.error('حدث خطأ في سير طباعة المعاينة:', err);
+        // في حال الخطأ، تأكد من استعادة الواجهة
+        restoreAllDisplaysAfterPrint();
+        isPrintFlowActive = false;
+        printButton.disabled = false;
+        updateStatus('خطأ أثناء التحضير للطباعة');
+      }
+    });
+
+    // كإجراء وقائي: إذا غادر المستخدم الصفحة أثناء سير طباعة (refresh/close)، نحاول تنظيف المؤقتات
+    window.addEventListener('beforeunload', () => {
+      if (printTimerId) clearTimeout(printTimerId);
+      if (debounceTimer) clearTimeout(debounceTimer);
+      if (scheduledConversionTimeout) clearTimeout(scheduledConversionTimeout);
+    });
+
+  </script>
+
+</body>
+</html>
