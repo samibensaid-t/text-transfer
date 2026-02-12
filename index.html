@@ -2,96 +2,12 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <title>Tranfer text</title>
+  <title>معاينة Markdown + LaTeX</title>
 
-<script>
-(function () {
-
-  function loadScript(src, check, fallback) {
-    return new Promise((resolve, reject) => {
-      const script = document.createElement("script");
-      script.src = src;
-      script.onload = () => {
-        if (!check || check()) {
-          resolve();
-        } else if (fallback) {
-          loadScript(fallback.src, fallback.check).then(resolve).catch(reject);
-        } else {
-          reject();
-        }
-      };
-      script.onerror = () => {
-        if (fallback) {
-          loadScript(fallback.src, fallback.check).then(resolve).catch(reject);
-        } else {
-          reject();
-        }
-      };
-      document.head.appendChild(script);
-    });
-  }
-
-  function loadStyle(href, fallbackHref) {
-    return new Promise((resolve) => {
-      const link = document.createElement("link");
-      link.rel = "stylesheet";
-      link.href = href;
-      link.onload = resolve;
-      link.onerror = () => {
-        if (fallbackHref) {
-          const fallbackLink = document.createElement("link");
-          fallbackLink.rel = "stylesheet";
-          fallbackLink.href = fallbackHref;
-          document.head.appendChild(fallbackLink);
-        }
-        resolve();
-      };
-      document.head.appendChild(link);
-    });
-  }
-
-  // KaTeX CSS
-  loadStyle(
-    "lib/katex.min.css",
-    "https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css"
-  );
-
-  // Marked
-  loadScript(
-    "lib/marked.min.js",
-    () => typeof window.marked !== "undefined",
-    {
-      src: "https://cdn.jsdelivr.net/npm/marked/marked.min.js",
-      check: () => typeof window.marked !== "undefined"
-    }
-  )
-
-  // KaTeX Core
-  .then(() => loadScript(
-    "lib/katex.min.js",
-    () => typeof window.katex !== "undefined",
-    {
-      src: "https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js",
-      check: () => typeof window.katex !== "undefined"
-    }
-  ))
-
-  // KaTeX Auto Render
-  .then(() => loadScript(
-    "lib/auto-render.min.js",
-    () => typeof window.renderMathInElement !== "undefined",
-    {
-      src: "https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/contrib/auto-render.min.js",
-      check: () => typeof window.renderMathInElement !== "undefined"
-    }
-  ))
-
-  .catch(() => {
-    console.error("فشل تحميل إحدى المكتبات");
-  });
-
-})();
-</script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/contrib/auto-render.min.js"></script>
 
   <style>
     body { font-family: "Amiri", "Arial", sans-serif; margin: 20px; background: #f9f9f9; direction: rtl; }
@@ -108,16 +24,15 @@
 }
    
    
-pre, code {
+    pre, code {
       background: #f5f5f5;
-    //  padding: 4px 8px;
-  //    border-radius: 4px;
+      padding: 4px 8px;
+      border-radius: 4px;
       direction: ltr;
       text-align: left;
-  //    display: block;
+      display: block;
       overflow-x: auto;
     }
-
 
     table {
       border-collapse: collapse;
@@ -205,9 +120,11 @@ pre, code {
       <input id="fileInput" type="file" accept=".txt,text/plain" />
       <button id="clearButton" title="مسح المحتوى">مسح النص</button>
       <!-- زر الطباعة المطلوب -->
+      <button id="downloadDocxBtn">Download as DOCX</button>
+
       <button id="printButton" title="إخفاء الواجهة وتهيئة المعاينة للطباعة">تحويل إلى pdf من متصفح</button>
     </div>
-
+     
     <div id="statusBar" aria-live="polite">
       الحالة: <span id="statusText">جاهز</span>
       <span id="lastConverted" style="margin-inline-start:10px; font-size:0.9rem; color:#666;"></span>
@@ -342,6 +259,45 @@ function renderMathInElementSafe(container) {
     }
   }
 }
+
+
+     function smartAutoDirection() {
+    const container = document.getElementById("preview");
+
+    const arabicRegex = /[\u0600-\u06FF]/g;
+    const latinRegex = /[A-Za-z]/g;
+
+    function processElement(element) {
+
+        // إذا كان صورة → توسيطها
+        if (element.tagName === "IMG") {
+            element.style.display = "block";
+            element.style.margin = "20px auto";
+            element.style.textAlign = "center";
+            return;
+        }
+
+        // إذا لا يحتوي نص مباشر → تجاهل
+        const text = element.innerText?.trim();
+        if (!text) return;
+
+        const arabicMatches = text.match(arabicRegex) || [];
+        const latinMatches = text.match(latinRegex) || [];
+
+        const total = arabicMatches.length + latinMatches.length;
+        if (total === 0) return;
+
+        const arabicRatio = arabicMatches.length / total;
+
+        element.dir = arabicRatio > 0.5 ? "rtl" : "ltr";
+    }
+
+    // المرور على كل العناصر داخل preview
+    container.querySelectorAll("*").forEach(processElement);
+}
+
+
+
 
 
     // دالة تقوم بالتحويل الفعلي وتحديث الواجهة
@@ -683,6 +639,64 @@ function renderMathInElementSafe(container) {
       if (debounceTimer) clearTimeout(debounceTimer);
       if (scheduledConversionTimeout) clearTimeout(scheduledConversionTimeout);
     });
+    
+    
+    
+    
+    
+    document.addEventListener("DOMContentLoaded", function () {
+
+    const preview = document.getElementById("preview");
+
+    // تشغيل أول مرة
+    smartAutoDirection();
+
+    // إعادة التشغيل كل 5 ثواني
+    setInterval(() => {
+        smartAutoDirection();
+    }, 5000);
+
+    // إعادة التشغيل عند أي تعديل داخل preview
+    const observer = new MutationObserver(() => {
+        smartAutoDirection();
+    });
+
+    observer.observe(preview, {
+        childList: true,
+        subtree: true,
+        characterData: true
+    });
+
+});
+
+
+
+
+
+document.getElementById("downloadDocxBtn").addEventListener("click", async () => {
+    try {
+        const preview = document.getElementById("preview");
+        const htmlContent = preview.innerHTML; // محتوى HTML للنصوص والجداول والصور
+
+        // DocShift يحوّل HTML إلى Blob بصيغة Docx
+        const docxBlob = await docshift.toDocx(htmlContent);
+
+        // تنزيل الملف
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(docxBlob);
+        link.download = "preview-content.docx";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+    } catch (error) {
+        console.error("Error converting to DOCX:", error);
+    }
+});
+
+
+
+
 
   </script>
 
