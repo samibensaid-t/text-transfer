@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <title>Tranfer text</title>
+  <title>معاينة Markdown + LaTeX</title>
 
 <script>
 (function () {
@@ -92,6 +92,8 @@
 
 })();
 </script>
+
+
 
   <style>
     body { font-family: "Amiri", "Arial", sans-serif; margin: 20px; background: #f9f9f9; direction: rtl; }
@@ -236,6 +238,11 @@ console.log("مرحبا يا عالم");
   <div id="message" aria-live="polite"></div>
 
   <script>
+  
+  <script src="https://cdn.jsdelivr.net/npm/docshift@latest"></script>
+
+  
+  
     // عناصر DOM
     const editor = document.getElementById("editor");
     const preview = document.getElementById("preview");
@@ -683,6 +690,83 @@ function renderMathInElementSafe(container) {
       if (debounceTimer) clearTimeout(debounceTimer);
       if (scheduledConversionTimeout) clearTimeout(scheduledConversionTimeout);
     });
+
+
+
+function smartAutoDirection() {
+    const container = document.getElementById("preview");
+
+    const arabicRegex = /[\u0600-\u06FF]/g;
+    const latinRegex = /[A-Za-z]/g;
+
+    function processElement(element) {
+
+        // إذا كان صورة → توسيطها
+        if (element.tagName === "IMG") {
+            element.style.display = "block";
+            element.style.margin = "20px auto";
+            element.style.textAlign = "center";
+            return;
+        }
+
+        // إذا لا يحتوي نص مباشر → تجاهل
+        const text = element.innerText?.trim();
+        if (!text) return;
+
+        const arabicMatches = text.match(arabicRegex) || [];
+        const latinMatches = text.match(latinRegex) || [];
+
+        const total = arabicMatches.length + latinMatches.length;
+        if (total === 0) return;
+
+        const arabicRatio = arabicMatches.length / total;
+
+        element.dir = arabicRatio > 0.5 ? "rtl" : "ltr";
+    }
+
+    // المرور على كل العناصر داخل preview
+    container.querySelectorAll("*").forEach(processElement);
+}
+
+
+
+
+
+
+
+
+
+
+
+    document.addEventListener("DOMContentLoaded", function () {
+
+    const preview = document.getElementById("preview");
+
+    // تشغيل أول مرة
+    smartAutoDirection();
+
+    // إعادة التشغيل كل 5 ثواني
+    setInterval(() => {
+        smartAutoDirection();
+    }, 5000);
+
+    // إعادة التشغيل عند أي تعديل داخل preview
+    const observer = new MutationObserver(() => {
+        smartAutoDirection();
+    });
+
+    observer.observe(preview, {
+        childList: true,
+        subtree: true,
+        characterData: true
+    });
+
+});
+
+
+
+
+
 
   </script>
 
